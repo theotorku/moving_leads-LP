@@ -1,21 +1,22 @@
 import nodemailer from 'nodemailer';
+import { config } from '../lib/config';
 
 // Create reusable transporter
 const createTransporter = () => {
   // For development, use ethereal email (fake SMTP)
   // For production, use real SMTP service (SendGrid, Mailgun, etc.)
   
-  if (process.env.NODE_ENV === 'production' && process.env.SMTP_HOST) {
-    return nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
-  }
+	  if (config.isProduction && config.smtp.host) {
+	    return nodemailer.createTransport({
+	      host: config.smtp.host,
+	      port: config.smtp.port,
+	      secure: config.smtp.secure,
+	      auth: {
+	        user: config.smtp.user,
+	        pass: config.smtp.pass
+	      }
+	    });
+	  }
 
   // Development: Log emails to console
   return nodemailer.createTransport({
@@ -34,8 +35,8 @@ export async function sendWelcomeEmail(email: string, name?: string): Promise<vo
     
     const displayName = name || 'there';
     
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || 'MovingLead <noreply@movinglead.com>',
+	    	    const mailOptions = {
+	      from: config.emailFrom,
       to: email,
       subject: 'Welcome to MovingLead - Your Free Trial Starts Now! 🚀',
       html: `
@@ -74,8 +75,8 @@ export async function sendWelcomeEmail(email: string, name?: string): Promise<vo
                 <div class="feature">ROI tracking dashboard</div>
               </div>
               
-              <p style="text-align: center;">
-                <a href="${process.env.FRONTEND_URL || 'http://localhost:5174'}/dashboard" class="button">
+	              <p style="text-align: center;">
+	                <a href="${config.frontendUrl}/dashboard" class="button">
                   Get Started Now
                 </a>
               </p>
@@ -126,7 +127,7 @@ The MovingLead Team
       `
     };
 
-    const info = await transporter.sendMail(mailOptions);
+	  	    const info = await transporter.sendMail(mailOptions);
 
     if (process.env.NODE_ENV !== 'production') {
       console.log('📧 Email sent (development mode):');
@@ -150,7 +151,7 @@ export async function sendAdminNotification(leadData: {
   name?: string;
   company?: string;
 }): Promise<void> {
-  if (!process.env.ADMIN_EMAIL) {
+	  if (!config.adminEmail) {
     console.log('No admin email configured, skipping notification');
     return;
   }
@@ -158,9 +159,9 @@ export async function sendAdminNotification(leadData: {
   try {
     const transporter = createTransporter();
     
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || 'MovingLead <noreply@movinglead.com>',
-      to: process.env.ADMIN_EMAIL,
+	    	    const mailOptions = {
+	      from: config.emailFrom,
+	      to: config.adminEmail,
       subject: '🎉 New Lead Signup!',
       html: `
         <h2>New Lead Registered</h2>

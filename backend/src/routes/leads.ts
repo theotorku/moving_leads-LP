@@ -1,14 +1,15 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { leads } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { validateEmail } from '../utils/validation';
 import { sendWelcomeEmail } from '../services/emailService';
+import { requireApiKey } from '../middleware/authMiddleware';
 
 const router = Router();
 
 // Create a new lead (from landing page signup)
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log('Received POST request to /api/leads');
     console.log('Request body:', req.body);
@@ -63,18 +64,15 @@ router.post('/', async (req: Request, res: Response) => {
         email: lead.email
       }
     });
-  } catch (error) {
-    console.error('Error creating lead:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    res.status(500).json({
-      success: false,
-      error: 'Failed to process your request. Please try again.'
-    });
-  }
+	  } catch (error) {
+	    console.error('Error creating lead:', error);
+	    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+	    return next(error);
+	  }
 });
 
-// Get all leads (admin endpoint - should be protected in production)
-router.get('/', async (req: Request, res: Response) => {
+// Get all leads (admin endpoint - protected)
+router.get('/', requireApiKey, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
 
@@ -84,9 +82,9 @@ router.get('/', async (req: Request, res: Response) => {
     let allLeads;
 
     if (status) {
-      allLeads = await db.select().from(leads).where(eq(leads.status, String(status))).all();
+      allLeads = await db.select().from(leads).where(eq(leads.status, String(status)));
     } else {
-      allLeads = await db.select().from(leads).all();
+      allLeads = await db.select().from(leads);
     }
 
     const total = allLeads.length;
@@ -102,28 +100,35 @@ router.get('/', async (req: Request, res: Response) => {
         pages: Math.ceil(total / Number(limit))
       }
     });
-  } catch (error) {
-    console.error('Error fetching leads:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch leads'
-    });
-  }
+	  } catch (error) {
+	    console.error('Error fetching leads:', error);
+	    return next(error);
+	  }
 });
 
-// Get lead stats
-router.get('/stats', async (req: Request, res: Response) => {
+// Get lead stats (protected)
+router.get('/stats', requireApiKey, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { gte } = await import('drizzle-orm');
-
-    const allLeads = await db.select().from(leads).all();
-    const total = allLeads.length;
+    const { gte, count, sql } = await import('drizzle-orm');
 
     const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const today = allLeads.filter(lead => lead.createdAt && lead.createdAt >= todayStart).length;
-    const thisWeek = allLeads.filter(lead => lead.createdAt && lead.createdAt >= weekAgo).length;
+    // Get total leads
+    const [totalResult] = await db.select({ value: count() }).from(leads);
+    const total = totalResult.value;
+
+    // Get today's leads
+    const [todayResult] = await db.select({ value: count() })
+      .from(leads)
+      .where(gte(leads.createdAt, todayStart));
+    const today = todayResult.value;
+
+    // Get this week's leads
+    const [weekResult] = await db.select({ value: count() })
+      .from(leads)
+      .where(gte(leads.createdAt, weekAgo));
+    const thisWeek = weekResult.value;
 
     res.json({
       success: true,
@@ -133,13 +138,10 @@ router.get('/stats', async (req: Request, res: Response) => {
         thisWeek
       }
     });
-  } catch (error) {
-    console.error('Error fetching stats:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch statistics'
-    });
-  }
+	  } catch (error) {
+	    console.error('Error fetching stats:', error);
+	    return next(error);
+	  }
 });
 
 export default router;

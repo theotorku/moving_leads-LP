@@ -59,7 +59,7 @@ A modern, full-stack landing page for AI-Scored Moving Leads built with React, V
 - **Node.js** - Runtime environment
 - **Express** - Web framework
 - **Drizzle ORM** - TypeScript-first ORM
-- **SQLite** - Database (better-sqlite3)
+- **PostgreSQL** - Primary database (e.g. Supabase)
 - **Nodemailer** - Email service
 
 ## Getting Started
@@ -109,7 +109,7 @@ cp .env.example .env
 4. Run database migrations:
 
 ```bash
-npx drizzle-kit push
+npm run db:migrate
 ```
 
 5. Start the backend server:
@@ -229,27 +229,85 @@ To customize the landing page:
 
 ## Environment Variables
 
-### Backend (.env)
+### Backend (`backend/.env`)
 
 ```env
-PORT=3001
+# Server configuration
 NODE_ENV=development
-DATABASE_URL=file:./sqlite.db
-CORS_ORIGIN=http://localhost:5173
+PORT=3001
 
-# Email Configuration (optional)
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=your-email@example.com
-SMTP_PASS=your-password
-EMAIL_FROM=noreply@example.com
+# Database - PostgreSQL (e.g. Supabase)
+DATABASE_URL=postgresql://postgres:your-password@your-project-ref.supabase.co:5432/postgres
+
+# Admin authentication
+ADMIN_API_KEY=your-secure-api-key-here
+
+# Frontend URL for CORS
+FRONTEND_URL=http://localhost:5174
+
+# Email configuration (optional, mainly for production)
+EMAIL_FROM="MovingLead <noreply@movinglead.com>"
+ADMIN_EMAIL=admin@movinglead.com
+
+# SMTP settings (optional)
+# SMTP_HOST=smtp.sendgrid.net
+# SMTP_PORT=587
+# SMTP_SECURE=false
+# SMTP_USER=apikey
+# SMTP_PASS=your-sendgrid-api-key
 ```
 
-### Frontend (.env)
+### Frontend (`.env` at repo root)
 
 ```env
+# URL of the backend API that the frontend should call
 VITE_API_URL=http://localhost:3001
 ```
+
+## Deployment & Docker
+
+### Backend container
+
+A production-ready Dockerfile is provided at `backend/Dockerfile`.
+
+Build and run the backend image:
+
+```bash
+# From the repository root
+cd backend
+docker build -t movinglead-backend .
+
+# Example run (configure env vars for your environment)
+docker run -p 3001:3001 \
+  -e NODE_ENV=production \
+  -e DATABASE_URL="postgresql://..." \
+  -e ADMIN_API_KEY="your-secure-api-key" \
+  -e FRONTEND_URL="https://your-frontend-domain" \
+  --name movinglead-backend \
+  movinglead-backend
+```
+
+### Frontend container
+
+A multi-stage Dockerfile for the Vite React frontend lives at `Dockerfile` in the repo root.
+
+Build and run the frontend image (served via Nginx on port 80):
+
+```bash
+# From the repository root
+docker build -t movinglead-frontend .
+
+# Example run (serves static files on port 80 inside the container)
+docker run -p 8080:80 --name movinglead-frontend movinglead-frontend
+```
+
+In production, set `VITE_API_URL` at build time to point to your deployed backend, e.g.:
+
+```bash
+VITE_API_URL="https://api.yourdomain.com" npm run build
+```
+
+Then build your frontend Docker image from the pre-built `dist` folder or by re-running `docker build`.
 
 ## License
 

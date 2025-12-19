@@ -1,35 +1,38 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
-export const leads = sqliteTable('leads', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+export const leads = pgTable('leads', {
+  id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
   name: text('name'),
   company: text('company'),
   phone: text('phone'),
   source: text('source').notNull().default('landing_page'),
   status: text('status').notNull().default('new'),
-  createdAt: integer('created_at', { mode: 'timestamp' })
+  createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
-    .default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()
-    .default(sql`(unixepoch())`)
+    .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
-export const subscriptions = sqliteTable('subscriptions', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-  leadId: text('lead_id').notNull().unique(),
+export const subscriptions = pgTable('subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  leadId: uuid('lead_id')
+    .notNull()
+    .unique()
+    .references(() => leads.id),
   plan: text('plan').notNull().default('professional'),
   status: text('status').notNull().default('trial'),
-  trialEndsAt: integer('trial_ends_at', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' })
+  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
-    .default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()
-    .default(sql`(unixepoch())`)
+    .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
